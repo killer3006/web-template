@@ -17,29 +17,14 @@ import {
   H4,
   Button,
   ExternalLink,
-  InlineTextButton,
   FieldSelect,
   FieldRadioButton,
   Form,
-  StripeBankAccountTokenInputField,
 } from '../../components';
 
 import css from './StripeConnectAccountForm.module.css';
 
 const getSupportedCountryCodes = supportedCountries => supportedCountries.map(c => c.code);
-const stripeCountryConfigs = (countryCode, supportedCountries) => {
-  const country = supportedCountries.find(c => c.code === countryCode);
-
-  if (!country) {
-    throw new Error(`Country code not found in Stripe config ${countryCode}`);
-  }
-  return country;
-};
-
-const countryCurrency = (countryCode, supportedCountries) => {
-  const country = stripeCountryConfigs(countryCode, supportedCountries);
-  return country.currency;
-};
 
 // Hidden input field
 const FieldHidden = props => {
@@ -57,7 +42,7 @@ const CreateStripeAccountFields = props => {
     disabled,
     countryLabel,
     showAsRequired,
-    form,
+    formApi,
     values,
     intl,
     currentUserId,
@@ -80,7 +65,7 @@ const CreateStripeAccountFields = props => {
     // Use user profile page as business_url on this marketplace
     // or just fake it if it's dev environment using Stripe test endpoints
     // because Stripe will not allow passing a localhost URL
-    const hasBusinessURL = values && values.businessProfileURL;
+    const hasBusinessURL = values?.businessProfileURL;
     if (!hasBusinessURL && currentUserId) {
       const pathToProfilePage = uuid =>
         createResourceLocatorString('ProfilePage', routeConfiguration, { id: uuid }, {});
@@ -91,17 +76,15 @@ const CreateStripeAccountFields = props => {
           ? `${rootUrl}${pathToProfilePage(currentUserId.uuid)}`
           : `https://test-marketplace.com${pathToProfilePage(currentUserId.uuid)}`;
       const defaultBusinessURL = `${profilePageURL}?mode=storefront`;
-      form.change('businessProfileURL', defaultBusinessURL);
+      formApi.change('businessProfileURL', defaultBusinessURL);
     }
 
-    const hasMCC = values && values.businessProfileMCC;
+    const hasMCC = values?.businessProfileMCC;
     // Use default merchant category code (MCC) from stripe-config.js
     if (!hasMCC && defaultMCC) {
-      form.change('businessProfileMCC', defaultMCC);
+      formApi.change('businessProfileMCC', defaultMCC);
     }
   }, []);
-
-  const country = values.country;
 
   return (
     <div className={css.sectionContainer}>
@@ -153,31 +136,16 @@ const CreateStripeAccountFields = props => {
         ))}
       </FieldSelect>
 
-      {country ? (
-        <StripeBankAccountTokenInputField
-          className={css.bankDetailsStripeField}
-          disabled={disabled}
-          name="bankAccountToken"
-          formName="StripeConnectAccountForm"
-          country={country}
-          currency={countryCurrency(country, supportedCountries)}
-          validate={validators.required(' ')}
-        />
-      ) : null}
     </div>
   );
 };
 
 const UpdateStripeAccountFields = props => {
   const {
-    disabled,
     countryLabel,
     savedCountry,
-    showCardUpdateInput,
     submitInProgress,
-    setShowCardUpdateInput,
     stripeBankAccountLastDigits,
-    supportedCountries,
   } = props;
 
   return (
@@ -186,28 +154,18 @@ const UpdateStripeAccountFields = props => {
       <div className={css.savedCountry}>
         <FormattedMessage id={`StripeConnectAccountForm.countryNames.${savedCountry}`} />
       </div>
-      <label className={css.accountInformationTitle}>
-        <FormattedMessage id="StripeConnectAccountForm.bankAccountLabel" />
-      </label>
 
-      {showCardUpdateInput && savedCountry ? (
-        <StripeBankAccountTokenInputField
-          className={css.bankDetailsStripeField}
-          disabled={disabled}
-          name="bankAccountToken"
-          formName="StripeConnectAccountForm"
-          country={savedCountry}
-          currency={countryCurrency(savedCountry, supportedCountries)}
-          validate={validators.required(' ')}
-        />
-      ) : !submitInProgress ? (
-        <InlineTextButton
-          className={css.savedBankAccount}
-          onClick={() => setShowCardUpdateInput(true)}
-        >
-          •••••••••••••••••••••••• {stripeBankAccountLastDigits}
-        </InlineTextButton>
-      ) : null}
+      {!submitInProgress && !!stripeBankAccountLastDigits ? (
+        <>
+          <label className={css.accountInformationTitle}>
+            <FormattedMessage id="StripeConnectAccountForm.bankAccountLabel" />
+          </label>
+
+          <div className={css.savedBankAccount}>
+            •••••••••••••••••••••••• {stripeBankAccountLastDigits}
+          </div>
+        </>
+      ) : null }
     </div>
   );
 };
@@ -267,7 +225,7 @@ const StripeConnectAccountFormComponent = props => {
           stripeAccountFetched,
           stripeBankAccountLastDigits,
           submitButtonText,
-          form,
+          form: formApi,
           values,
           stripeConnected,
           currentUser,
@@ -298,7 +256,6 @@ const StripeConnectAccountFormComponent = props => {
         // because Stripe doesn't allow user to change the country
         const stripeAccountFields = !stripeConnected ? (
           <CreateStripeAccountFields
-            stripeConnected={stripeConnected}
             disabled={disabled}
             showAsRequired={showAsRequired}
             countryLabel={countryLabel}
@@ -306,22 +263,16 @@ const StripeConnectAccountFormComponent = props => {
             marketplaceRootURL={config.marketplaceRootURL}
             defaultMCC={config.stripe.defaultMCC}
             currentUserId={currentUserId}
-            form={form}
+            formApi={formApi}
             values={values}
             intl={intl}
           />
         ) : (
           <UpdateStripeAccountFields
-            disabled={disabled}
             countryLabel={countryLabel}
-            supportedCountries={supportedCountries}
             savedCountry={savedCountry}
             stripeBankAccountLastDigits={stripeBankAccountLastDigits}
-            showCardUpdateInput={showCardUpdateInput}
-            values={values}
             submitInProgress={submitInProgress}
-            setShowCardUpdateInput={setShowCardUpdateInput}
-            intl={intl}
           />
         );
 
